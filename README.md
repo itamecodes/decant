@@ -58,6 +58,34 @@ One-tap presets for the common ones are built in; anything else is a base URL +
 model you paste in Settings. Summaries use JSON-object mode with lenient parsing,
 so models that don't support strict schemas still work.
 
+## Costs
+
+The app is free; you pay your provider per use, on your own key — no
+subscription. **Transcription dominates the cost (~90%); the summary is pennies.**
+
+On the default OpenAI config (`gpt-4o-transcribe` + `gpt-4o`):
+
+| Meeting length | Transcription (~$0.006/min) | Summary (gpt-4o) | **Total**  |
+| -------------- | --------------------------- | ---------------- | ---------- |
+| 30 min         | ~$0.18                      | ~$0.02           | **~$0.20** |
+| 60 min         | ~$0.36                      | ~$0.03           | **~$0.39** |
+
+Roughly a few dollars a month for typical use. (The 25 MB upload cap is about
+25–30 min per note, so one note tops out near ~$0.20 unless you split longer
+recordings.)
+
+**Paying less** — this is what per-endpoint providers are for:
+
+- **Summary → `gpt-4o-mini`** (or DeepSeek): drops the summary to a fraction of
+  a cent.
+- **Transcription → Groq `whisper-large-v3`**: roughly a tenth of OpenAI's
+  per-hour rate.
+- Together, a meeting can run **~2–5¢** instead of ~20¢. On-device transcription
+  (see [Ideas](#ideas)) would make the dominant cost $0.
+
+_Estimates only — provider prices change, so check their pricing pages. Assumes
+~1.3 tokens per word._
+
 ## Requirements
 
 - macOS with **Xcode 16.2+**
