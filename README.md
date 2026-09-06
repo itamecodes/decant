@@ -7,6 +7,16 @@ on **your own** API key.
 
 No account. No backend of ours. You bring the key; you pick the provider.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/list.png" alt="Notes list grouped by day" width="24%">
+  <img src="docs/screenshots/detail.png" alt="Note detail: summary and action items" width="24%">
+  <img src="docs/screenshots/record.png" alt="Recording screen" width="24%">
+  <img src="docs/screenshots/settings.png" alt="Provider settings" width="24%">
+</p>
+<p align="center"><sub>Capture log · note detail · recording · provider settings</sub></p>
+
 ---
 
 ## What it does
