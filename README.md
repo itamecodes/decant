@@ -86,6 +86,19 @@ recordings.)
 _Estimates only — provider prices change, so check their pricing pages. Assumes
 ~1.3 tokens per word._
 
+## Metrics
+
+Every note records how it was made — computed on-device, never sent anywhere:
+
+- **Per note** — a "Run" panel on each note shows its estimated cost,
+  transcription and summary latency, tokens used, and the models used.
+- **Across all notes** — the Usage screen (chart icon on the home screen)
+  aggregates estimated spend, audio minutes processed, average latency, total
+  tokens, and a per-model cost breakdown.
+
+Costs use the same local rate table as [Costs](#costs) above; an unknown model
+contributes $0 rather than a guess, so read the totals as a guide, not a bill.
+
 ## Requirements
 
 - macOS with **Xcode 16.2+**

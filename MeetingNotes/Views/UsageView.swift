@@ -1,8 +1,10 @@
 import SwiftUI
 import SwiftData
+import Charts
 
-/// Aggregate, on-device usage metrics across all notes: estimated spend,
-/// latency, tokens, and a per-model breakdown. Nothing here leaves the device.
+/// Aggregate, on-device usage metrics across all notes: charts of daily spend
+/// and volume, per-recording latency and cost, plus totals. Nothing here leaves
+/// the device.
 struct UsageView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var notes: [Note]
@@ -13,6 +15,15 @@ struct UsageView: View {
 
     private var avgTranscribe: TimeInterval { average(\.transcriptionLatency) }
     private var avgSummarize: TimeInterval { average(\.summaryLatency) }
+
+    private var dailyBuckets: [DailyBucket] { MetricsAggregator.dailyBuckets(notes) }
+    private var recordings: [RecordingPoint] { MetricsAggregator.recentRecordings(notes) }
+    private var maxMinutes: Double { max(recordings.map(\.minutes).max() ?? 0, 0.0001) }
+
+    /// Bar color for a recording, darker/accent for longer clips.
+    private func lengthColor(_ minutes: Double) -> Color {
+        Theme.accent.opacity(0.35 + 0.65 * min(minutes / maxMinutes, 1))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,6 +51,8 @@ struct UsageView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 28) {
                         headline
+                        dailyCharts
+                        recordingCharts
                         stats
                         modelBreakdown
                         Text("Estimates only, computed on-device from built-in rates. Actual charges come from your provider.")
@@ -64,6 +77,102 @@ struct UsageView: View {
                 .font(Theme.head(56))
                 .monospacedDigit()
                 .foregroundStyle(Theme.text)
+        }
+    }
+
+    // MARK: - Charts
+
+    private var dailyCharts: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            chartBlock(title: "Spend / day", caption: "Last 14 days") {
+                Chart(dailyBuckets) { bucket in
+                    BarMark(
+                        x: .value("Day", bucket.date, unit: .day),
+                        y: .value("Spend", bucket.cost)
+                    )
+                    .cornerRadius(0)
+                    .foregroundStyle(Theme.accent)
+                }
+                .chartYAxis { AxisMarks(position: .leading) }
+                .chartXAxis { dayAxis }
+                .frame(height: 120)
+            }
+            chartBlock(title: "Notes / day", caption: "Last 14 days") {
+                Chart(dailyBuckets) { bucket in
+                    BarMark(
+                        x: .value("Day", bucket.date, unit: .day),
+                        y: .value("Notes", bucket.count)
+                    )
+                    .cornerRadius(0)
+                    .foregroundStyle(Theme.accent)
+                }
+                .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) }
+                .chartXAxis { dayAxis }
+                .frame(height: 120)
+            }
+        }
+    }
+
+    private var recordingCharts: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack {
+                Eyebrow(text: "By recording", size: 11, em: 0.16, color: Theme.accent700, heading: true)
+                Spacer()
+                lengthLegend
+            }
+            chartBlock(title: "Latency", caption: "seconds") {
+                recordingChart { $0.latency }
+            }
+            chartBlock(title: "Cost", caption: "USD") {
+                recordingChart { $0.cost }
+            }
+        }
+    }
+
+    private func recordingChart(_ value: @escaping (RecordingPoint) -> Double) -> some View {
+        Chart(recordings) { point in
+            BarMark(
+                x: .value("Recording", point.index),
+                y: .value("Value", value(point))
+            )
+            .cornerRadius(0)
+            .foregroundStyle(lengthColor(point.minutes))
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) }
+        .frame(height: 120)
+    }
+
+    private var dayAxis: some AxisContent {
+        AxisMarks(values: .stride(by: .day, count: 3)) { _ in
+            AxisGridLine()
+            AxisTick()
+            AxisValueLabel(format: .dateTime.month(.defaultDigits).day())
+        }
+    }
+
+    /// Color key: length is encoded as bar shade.
+    private var lengthLegend: some View {
+        HStack(spacing: 6) {
+            Text("shorter").font(Theme.body(10)).foregroundStyle(Theme.ink(0.5))
+            LinearGradient(
+                colors: [Theme.accent.opacity(0.35), Theme.accent],
+                startPoint: .leading, endPoint: .trailing
+            )
+            .frame(width: 46, height: 7)
+            Text("longer").font(Theme.body(10)).foregroundStyle(Theme.ink(0.5))
+        }
+    }
+
+    private func chartBlock<Content: View>(
+        title: String, caption: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title).font(Theme.head(17)).foregroundStyle(Theme.text)
+                Text(caption).font(Theme.body(11)).foregroundStyle(Theme.ink(0.45))
+            }
+            content()
         }
     }
 
