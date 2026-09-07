@@ -128,6 +128,44 @@ struct NoteDetailView: View {
                     ActionItemRow(item: item)
                 }
             }
+
+            runPanel.padding(.top, 28)
+        }
+    }
+
+    /// A blueprint "spec" panel of the run metrics for this note.
+    private var runPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Eyebrow(text: "Run", size: 10, em: 0.1, color: Theme.accent)
+                Spacer()
+                Text("est.").font(Theme.body(10)).foregroundStyle(Theme.ink(0.45))
+            }
+            runRow("Est. cost", note.estimatedCostText)
+            runRow("Transcribe", Note.formatLatency(note.transcriptionLatency))
+            runRow("Summarize", Note.formatLatency(note.summaryLatency))
+            runRow("Tokens", note.totalTokens > 0 ? "\(note.promptTokens) in · \(note.completionTokens) out" : "—")
+            if !note.summaryModel.isEmpty {
+                runRow("Models", "\(note.transcriptionModel) · \(note.summaryModel)")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .overlay(Rectangle().strokeBorder(Theme.divider, lineWidth: 1))
+        .blueprintCorners()
+    }
+
+    private func runRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .font(Theme.body(12))
+                .foregroundStyle(Theme.ink(0.55))
+            Spacer(minLength: 12)
+            Text(value)
+                .font(Theme.head(15))
+                .monospacedDigit()
+                .foregroundStyle(Theme.text)
+                .multilineTextAlignment(.trailing)
         }
     }
 

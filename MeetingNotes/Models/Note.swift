@@ -13,6 +13,20 @@ final class Note {
     /// Length of the source audio in seconds (0 if unknown).
     var duration: TimeInterval = 0
 
+    // MARK: Run metrics (captured once, when the note is created)
+
+    /// Wall-clock seconds spent on the transcription and summary calls.
+    var transcriptionLatency: TimeInterval = 0
+    var summaryLatency: TimeInterval = 0
+    /// Token usage reported by the summary provider (0 if it didn't report any).
+    var promptTokens: Int = 0
+    var completionTokens: Int = 0
+    /// Estimated USD cost of producing this note (transcription + summary).
+    var estimatedCost: Double = 0
+    /// The models used, kept for the metrics breakdown.
+    var transcriptionModel: String = ""
+    var summaryModel: String = ""
+
     /// Ordered action items. Deleting the note deletes its items.
     @Relationship(deleteRule: .cascade)
     var actionItems: [ActionItem]
@@ -57,6 +71,24 @@ extension Note {
     /// Word count with a thousands separator, e.g. "3,412".
     var wordCountText: String {
         wordCount.formatted(.number.grouping(.automatic))
+    }
+
+    /// Total processing latency (transcription + summary), formatted like "4.1s".
+    var totalLatency: TimeInterval { transcriptionLatency + summaryLatency }
+
+    var totalTokens: Int { promptTokens + completionTokens }
+
+    /// Estimated cost, formatted for display ("<$0.01", "$0.02").
+    var estimatedCostText: String { Note.formatCost(estimatedCost) }
+
+    static func formatCost(_ value: Double) -> String {
+        if value <= 0 { return "—" }
+        if value < 0.01 { return "<$0.01" }
+        return String(format: "$%.2f", value)
+    }
+
+    static func formatLatency(_ seconds: TimeInterval) -> String {
+        seconds <= 0 ? "—" : String(format: "%.1fs", seconds)
     }
 
     /// Action items rendered as a plain-text checklist, for copy/share.

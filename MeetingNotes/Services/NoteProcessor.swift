@@ -20,6 +20,14 @@ struct ProcessedNote {
     let transcript: String
     let summary: SummaryResult
     let duration: TimeInterval
+    // Run metrics
+    let transcriptionLatency: TimeInterval
+    let summaryLatency: TimeInterval
+    let promptTokens: Int
+    let completionTokens: Int
+    let estimatedCost: Double
+    let transcriptionModel: String
+    let summaryModel: String
 }
 
 /// Orchestrates the transcribe → summarize pipeline for one audio file and
@@ -46,25 +54,51 @@ final class NoteProcessor {
         }
 
         // Read the clip length before uploading (best-effort).
-        let duration = (try? await AVURLAsset(url: audioURL).load(.duration).seconds) ?? 0
+        let rawDuration = (try? await AVURLAsset(url: audioURL).load(.duration).seconds) ?? 0
+        let duration = rawDuration.isFinite ? rawDuration : 0
+
+        let transcriptionModel = settings.transcriptionModel
+        let summaryModel = settings.summaryModel
 
         stage = .transcribing
         let transcription = TranscriptionService(
             apiKey: settings.transcriptionKey,
             baseURL: settings.transcriptionBaseURL,
-            model: settings.transcriptionModel
+            model: transcriptionModel
         )
+        let transcribeStart = Date()
         let transcript = try await transcription.transcribe(fileURL: audioURL)
+        let transcriptionLatency = Date().timeIntervalSince(transcribeStart)
 
         stage = .summarizing
         let summarizer = SummaryService(
             apiKey: settings.summaryKey,
             baseURL: settings.summaryBaseURL,
-            model: settings.summaryModel
+            model: summaryModel
         )
-        let summary = try await summarizer.summarize(transcript: transcript)
+        let summarizeStart = Date()
+        let output = try await summarizer.summarize(transcript: transcript)
+        let summaryLatency = Date().timeIntervalSince(summarizeStart)
 
-        return ProcessedNote(transcript: transcript, summary: summary,
-                             duration: duration.isFinite ? duration : 0)
+        // Estimate cost from what we know (0 for the parts of unknown models).
+        let transcriptionCost = Pricing.transcriptionCost(model: transcriptionModel, seconds: duration) ?? 0
+        let summaryCost = Pricing.summaryCost(
+            model: summaryModel,
+            promptTokens: output.promptTokens,
+            completionTokens: output.completionTokens
+        ) ?? 0
+
+        return ProcessedNote(
+            transcript: transcript,
+            summary: output.result,
+            duration: duration,
+            transcriptionLatency: transcriptionLatency,
+            summaryLatency: summaryLatency,
+            promptTokens: output.promptTokens,
+            completionTokens: output.completionTokens,
+            estimatedCost: transcriptionCost + summaryCost,
+            transcriptionModel: transcriptionModel,
+            summaryModel: summaryModel
+        )
     }
 }

@@ -3,6 +3,21 @@ import XCTest
 
 final class ServicesTests: XCTestCase {
 
+    func testPricingUsesLongestModelMatch() {
+        // "gpt-4o-mini" must match the mini rate, not "gpt-4o".
+        let mini = Pricing.summaryCost(model: "gpt-4o-mini-2024-07-18", promptTokens: 1_000_000, completionTokens: 0)
+        XCTAssertEqual(mini ?? -1, 0.15, accuracy: 0.0001)
+
+        let full = Pricing.summaryCost(model: "gpt-4o", promptTokens: 1_000_000, completionTokens: 0)
+        XCTAssertEqual(full ?? -1, 2.50, accuracy: 0.0001)
+
+        // 10 minutes of gpt-4o-transcribe at $0.006/min = $0.06.
+        let audio = Pricing.transcriptionCost(model: "gpt-4o-transcribe", seconds: 600)
+        XCTAssertEqual(audio ?? -1, 0.06, accuracy: 0.0001)
+
+        XCTAssertNil(Pricing.summaryCost(model: "some-unknown-model", promptTokens: 100, completionTokens: 100))
+    }
+
     func testEndpointBuilderToleratesTrailingSlash() {
         XCTAssertEqual(
             OpenAICompatible.endpoint("https://api.groq.com/openai/v1", "chat/completions")?.absoluteString,

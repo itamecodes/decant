@@ -7,6 +7,13 @@ struct SummaryResult: Decodable {
     let actionItems: [String]
 }
 
+/// A summary plus the token usage the provider reported (0 if none).
+struct SummaryOutput {
+    let result: SummaryResult
+    let promptTokens: Int
+    let completionTokens: Int
+}
+
 /// Generates a title, summary, and action items from a transcript via any
 /// OpenAI-compatible Chat Completions endpoint. Uses JSON-object mode with an
 /// explicitly described shape and lenient parsing, so it works across providers
@@ -24,7 +31,7 @@ struct SummaryService {
         self.session = session
     }
 
-    func summarize(transcript: String) async throws -> SummaryResult {
+    func summarize(transcript: String) async throws -> SummaryOutput {
         guard !apiKey.isEmpty else { throw OpenAIError.missingKey }
         guard let url = OpenAICompatible.endpoint(baseURL, "chat/completions") else {
             throw OpenAIError.invalidResponse
@@ -48,7 +55,9 @@ struct SummaryService {
             throw OpenAIError.http(status: http.statusCode, message: OpenAIResponseParser.errorMessage(from: data))
         }
 
-        return try Self.parse(data: data)
+        let result = try Self.parse(data: data)
+        let usage = Self.usage(from: data)
+        return SummaryOutput(result: result, promptTokens: usage.prompt, completionTokens: usage.completion)
     }
 
     /// The Chat Completions payload. `json_object` mode is far more widely
@@ -98,6 +107,17 @@ struct SummaryService {
             throw OpenAIError.invalidResponse
         }
         return result
+    }
+
+    /// Reads `usage.prompt_tokens` / `usage.completion_tokens` if the provider
+    /// reported them; returns zeros otherwise.
+    static func usage(from data: Data) -> (prompt: Int, completion: Int) {
+        struct UsageResponse: Decodable {
+            struct Usage: Decodable { let prompt_tokens: Int?; let completion_tokens: Int? }
+            let usage: Usage?
+        }
+        let decoded = try? JSONDecoder().decode(UsageResponse.self, from: data)
+        return (decoded?.usage?.prompt_tokens ?? 0, decoded?.usage?.completion_tokens ?? 0)
     }
 
     /// Returns the outermost `{ … }` object in a string, stripping any code

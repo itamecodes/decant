@@ -76,7 +76,7 @@ struct SettingsView: View {
             Text("On this device only")
                 .font(Theme.head(17))
                 .foregroundStyle(Theme.text)
-            Text("Notes stay on this device. Only the audio and transcript you send reach the provider you choose. No servers of ours, no account, no analytics.")
+            Text("Notes and usage metrics stay on this device. Only the audio and transcript you send reach the provider you choose. No servers of ours, no account, no tracking.")
                 .font(Theme.body(13))
                 .foregroundStyle(Theme.ink(0.8))
                 .lineSpacing(2)

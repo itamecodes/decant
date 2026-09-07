@@ -18,6 +18,7 @@ struct NotesListView: View {
     @State private var showingPhotosPicker = false
     @State private var pickedItem: PhotosPickerItem?
     @State private var showingSettings = false
+    @State private var showingUsage = false
     @State private var errorMessage: String?
 
     private enum CaptureStage {
@@ -41,6 +42,9 @@ struct NotesListView: View {
         .tint(Theme.accent)
         .sheet(isPresented: $showingSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showingUsage) {
+            UsageView()
         }
         .fullScreenCover(isPresented: $showingCapture) {
             switch captureStage {
@@ -106,18 +110,25 @@ struct NotesListView: View {
                     .foregroundStyle(Theme.text)
             }
             Spacer()
-            Button { showingSettings = true } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(Theme.text)
-                    .frame(width: 38, height: 38)
-                    .overlay(Rectangle().strokeBorder(Theme.divider, lineWidth: 1))
+            HStack(spacing: 8) {
+                headerIcon("chart.bar") { showingUsage = true }
+                headerIcon("slider.horizontal.3") { showingSettings = true }
             }
-            .buttonStyle(PressableStyle())
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
         .padding(.bottom, 12)
+    }
+
+    private func headerIcon(_ systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Theme.text)
+                .frame(width: 38, height: 38)
+                .overlay(Rectangle().strokeBorder(Theme.divider, lineWidth: 1))
+        }
+        .buttonStyle(PressableStyle())
     }
 
     private var countRow: some View {
@@ -293,13 +304,21 @@ struct NotesListView: View {
     }
 
     private func makeNote(from processed: ProcessedNote) -> Note {
-        Note(
+        let note = Note(
             title: processed.summary.title,
             transcript: processed.transcript,
             summary: processed.summary.summary,
             duration: processed.duration,
             actionItems: processed.summary.actionItems.map { ActionItem(text: $0) }
         )
+        note.transcriptionLatency = processed.transcriptionLatency
+        note.summaryLatency = processed.summaryLatency
+        note.promptTokens = processed.promptTokens
+        note.completionTokens = processed.completionTokens
+        note.estimatedCost = processed.estimatedCost
+        note.transcriptionModel = processed.transcriptionModel
+        note.summaryModel = processed.summaryModel
+        return note
     }
 }
 
