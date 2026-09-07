@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Meeting Notes</string>
+	<string>Decant</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Meeting Notes needs microphone access to record audio for transcription.</string>
+	<string>Decant needs microphone access to record audio for transcription.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Barlow-Regular.ttf</string>

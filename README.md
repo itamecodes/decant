@@ -1,4 +1,4 @@
-# Meeting Notes
+# Decant
 
 A private, native iOS app that turns a conversation into a clean note. Record a
 meeting (or import a video/audio file), and get back a **transcript**, an **AI
