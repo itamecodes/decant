@@ -13,6 +13,11 @@ final class Note {
     /// Length of the source audio in seconds (0 if unknown).
     var duration: TimeInterval = 0
 
+    /// Kept at the top of the list, above the day groups.
+    var isPinned: Bool = false
+    /// Flagged as important; can be filtered for.
+    var isStarred: Bool = false
+
     // MARK: Run metrics (captured once, when the note is created)
 
     /// Wall-clock seconds spent on the transcription and summary calls.

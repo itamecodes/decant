@@ -58,7 +58,7 @@ struct RecordingView: View {
                 Rectangle().fill(light.opacity(0.25)).frame(height: 1)
                     .padding(.vertical, 24)
 
-                WaveformView(color: Theme.accent300)
+                WaveformView(levels: recorder.levels, color: Theme.accent300)
                     .frame(height: 88)
 
                 HStack {

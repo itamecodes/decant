@@ -19,6 +19,7 @@ struct NotesListView: View {
     @State private var pickedItem: PhotosPickerItem?
     @State private var showingSettings = false
     @State private var showingUsage = false
+    @State private var starredOnly = false
     @State private var errorMessage: String?
 
     private enum CaptureStage {
@@ -112,6 +113,16 @@ struct NotesListView: View {
             Spacer()
             HStack(spacing: 8) {
                 headerIcon("chart.bar") { showingUsage = true }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { starredOnly.toggle() }
+                } label: {
+                    Image(systemName: starredOnly ? "star.fill" : "star")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(starredOnly ? Theme.accent : Theme.text)
+                        .frame(width: 38, height: 38)
+                        .overlay(Rectangle().strokeBorder(starredOnly ? Theme.accent : Theme.divider, lineWidth: 1))
+                }
+                .buttonStyle(PressableStyle())
                 headerIcon("slider.horizontal.3") { showingSettings = true }
             }
         }
@@ -133,7 +144,8 @@ struct NotesListView: View {
 
     private var countRow: some View {
         HStack {
-            Eyebrow(text: "\(notes.count) notes", size: 10, em: 0.14, color: Theme.ink(0.5))
+            Eyebrow(text: starredOnly ? "\(starredCount) starred" : "\(notes.count) notes",
+                    size: 10, em: 0.14, color: starredOnly ? Theme.accent700 : Theme.ink(0.5))
             Spacer()
             Eyebrow(text: "\(totalOpen) open actions", size: 10, em: 0.14, color: Theme.ink(0.5))
         }
@@ -146,24 +158,80 @@ struct NotesListView: View {
     @ViewBuilder private var content: some View {
         if notes.isEmpty {
             emptyState
+        } else if sections.isEmpty {
+            filteredEmptyState
         } else {
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: []) {
-                    ForEach(groupedSections) { section in
-                        groupHeader(section.title)
-                        ForEach(section.notes) { entry in
-                            NoteRowView(entry: entry) { path.append(entry.note) }
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        context.delete(entry.note)
-                                    } label: { Label("Delete note", systemImage: "trash") }
-                                }
+            List {
+                ForEach(sections) { section in
+                    Section {
+                        ForEach(section.entries) { entry in
+                            row(entry)
                         }
+                    } header: {
+                        groupHeader(section.title)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Theme.bg)
                     }
-                    Color.clear.frame(height: 24)
                 }
+                Color.clear.frame(height: 8)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Theme.bg)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Theme.bg)
+            .environment(\.defaultMinListRowHeight, 1)
+            .animation(.easeInOut(duration: 0.2), value: starredOnly)
         }
+    }
+
+    /// A list row with the native leading (pin/star) and trailing (delete) swipes.
+    /// The navigation is a chevron-less `NavigationLink` (rather than a Button) so
+    /// the List collapses an open swipe automatically when you tap into a note.
+    private func row(_ entry: NoteEntry) -> some View {
+        ZStack {
+            NavigationLink(value: entry.note) { EmptyView() }.opacity(0)
+            NoteRowView(entry: entry)
+        }
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Theme.bg)
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    context.delete(entry.note)
+                } label: { Label("Delete", systemImage: "trash") }
+            }
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                    withAnimation { entry.note.isPinned.toggle() }
+                } label: {
+                    Label(entry.note.isPinned ? "Unpin" : "Pin",
+                          systemImage: entry.note.isPinned ? "pin.slash.fill" : "pin.fill")
+                }
+                .tint(Theme.accent700)
+                Button {
+                    withAnimation { entry.note.isStarred.toggle() }
+                } label: {
+                    Label(entry.note.isStarred ? "Unstar" : "Star",
+                          systemImage: entry.note.isStarred ? "star.slash.fill" : "star.fill")
+                }
+                .tint(Theme.accent)
+            }
+    }
+
+    private var filteredEmptyState: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: "star").font(.system(size: 24)).foregroundStyle(Theme.ink(0.4))
+            Text("No starred notes").font(Theme.head(22)).foregroundStyle(Theme.text)
+            Text("Swipe a note and tap Star to flag it as important.")
+                .font(Theme.body(13)).foregroundStyle(Theme.ink(0.55))
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .padding(.horizontal, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func groupHeader(_ title: String) -> some View {
@@ -239,39 +307,9 @@ struct NotesListView: View {
 
     // MARK: - Grouping
 
-    struct NoteEntry: Identifiable {
-        let note: Note
-        let index: Int       // capture number (descending)
-        var id: UUID { note.id }
-    }
-
-    private struct DaySection: Identifiable {
-        let id: Date
-        let title: String
-        let notes: [NoteEntry]
-    }
-
     private var totalOpen: Int { notes.reduce(0) { $0 + $1.openCount } }
-
-    private var groupedSections: [DaySection] {
-        let calendar = Calendar.current
-        let entries = notes.enumerated().map { NoteEntry(note: $1, index: notes.count - $0) }
-        let groups = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.note.createdAt) }
-        return groups.keys.sorted(by: >).map { day in
-            DaySection(id: day, title: header(for: day),
-                       notes: groups[day]?.sorted { $0.note.createdAt > $1.note.createdAt } ?? [])
-        }
-    }
-
-    private func header(for day: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return "Today" }
-        if calendar.isDateInYesterday(day) { return "Yesterday" }
-        if let days = calendar.dateComponents([.day], from: day, to: .now).day, days < 7 {
-            return day.formatted(.dateTime.weekday(.wide))
-        }
-        return day.formatted(.dateTime.month().day().year())
-    }
+    private var starredCount: Int { notes.filter(\.isStarred).count }
+    private var sections: [NoteSection] { NoteOrganizer.sections(notes, starredOnly: starredOnly) }
 
     // MARK: - Actions
 
@@ -324,58 +362,65 @@ struct NotesListView: View {
 
 /// One capture-log row: index, title, time, preview, duration + open tags.
 private struct NoteRowView: View {
-    let entry: NotesListView.NoteEntry
-    let onTap: () -> Void
+    let entry: NoteEntry
 
     private var note: Note { entry.note }
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(String(format: "%02d", entry.index))
-                        .font(Theme.body(11))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.ink(0.45))
-                        .frame(width: 22, alignment: .leading)
-                    Text(note.title)
-                        .font(Theme.head(20))
-                        .tracking(-0.1)
-                        .foregroundStyle(Theme.text)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(String(format: "%02d", entry.number))
+                    .font(Theme.body(11))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink(0.45))
+                    .frame(width: 22, alignment: .leading)
+                if note.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Theme.accent)
+                }
+                Text(note.title)
+                    .font(Theme.head(20))
+                    .tracking(-0.1)
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if note.isStarred {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.accent)
+                }
+                Text(timeString(note.createdAt))
+                    .font(Theme.body(11))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink(0.5))
+            }
+            if !note.summary.isEmpty {
+                HStack(spacing: 12) {
+                    Color.clear.frame(width: 22, height: 0)
+                    Text(note.summary)
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.ink(0.62))
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Text(timeString(note.createdAt))
-                        .font(Theme.body(11))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.ink(0.5))
                 }
-                if !note.summary.isEmpty {
-                    HStack(spacing: 12) {
-                        Color.clear.frame(width: 22, height: 0)
-                        Text(note.summary)
-                            .font(Theme.body(13))
-                            .foregroundStyle(Theme.ink(0.62))
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                HStack(spacing: 8) {
-                    if note.duration > 0 {
-                        Tag(text: note.durationText, kind: .neutral)
-                    }
-                    if note.openCount > 0 {
-                        Tag(text: "\(note.openCount) open", kind: .outline)
-                    }
-                }
-                .padding(.leading, 34)
-                .padding(.top, 4)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 15)
-            .contentShape(Rectangle())
+            HStack(spacing: 8) {
+                if note.duration > 0 {
+                    Tag(text: note.durationText, kind: .neutral)
+                }
+                if note.openCount > 0 {
+                    Tag(text: "\(note.openCount) open", kind: .outline)
+                }
+            }
+            .padding(.leading, 34)
+            .padding(.top, 4)
         }
-        .buttonStyle(PressableStyle())
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .padding(.bottom, 15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.ink(0.08)).frame(height: 1)
         }

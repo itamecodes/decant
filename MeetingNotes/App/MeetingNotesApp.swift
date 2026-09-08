@@ -10,6 +10,9 @@ struct MeetingNotesApp: App {
         WindowGroup {
             RootView()
                 .environment(settings)
+                // The design is a fixed light "blueprint" palette; lock to light
+                // so system surfaces (List overscroll, sheets) never render dark.
+                .preferredColorScheme(.light)
         }
         .modelContainer(for: [Note.self, ActionItem.self])
     }

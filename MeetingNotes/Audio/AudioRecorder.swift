@@ -12,9 +12,15 @@ final class AudioRecorder {
     private(set) var isRecording = false
     private(set) var elapsed: TimeInterval = 0
 
+    /// Number of bars in the live waveform.
+    static let barCount = 42
+    /// Recent mic levels (0…1, oldest → newest) driving the waveform. Flat when silent.
+    private(set) var levels = [Double](repeating: 0, count: AudioRecorder.barCount)
+
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
     private var outputURL: URL?
+    private var smoothedLevel = 0.0
 
     /// Asks for microphone permission. Returns whether it was granted.
     func requestPermission() async -> Bool {
@@ -42,6 +48,7 @@ final class AudioRecorder {
         ]
 
         let recorder = try AVAudioRecorder(url: url, settings: settings)
+        recorder.isMeteringEnabled = true
         guard recorder.record() else {
             throw NSError(domain: "AudioRecorder", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "Could not start recording."])
@@ -51,6 +58,8 @@ final class AudioRecorder {
         self.outputURL = url
         self.isRecording = true
         self.elapsed = 0
+        self.smoothedLevel = 0
+        self.levels = [Double](repeating: 0, count: Self.barCount)
         startTimer()
     }
 
@@ -66,10 +75,23 @@ final class AudioRecorder {
     }
 
     private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, let recorder = self.recorder else { return }
                 self.elapsed = recorder.currentTime
+
+                // Sample the mic level and push it into the rolling waveform buffer.
+                recorder.updateMeters()
+                let db = Double(recorder.averagePower(forChannel: 0))   // ~ -160…0 dB
+                let floorDb = -55.0
+                var level = db <= floorDb ? 0 : (db - floorDb) / -floorDb  // 0…1
+                level = pow(min(max(level, 0), 1), 1.5)                    // quiet stays quiet
+                self.smoothedLevel = max(level, self.smoothedLevel * 0.80) // fast attack, gentle decay
+
+                var next = self.levels
+                next.removeFirst()
+                next.append(self.smoothedLevel)
+                self.levels = next
             }
         }
     }

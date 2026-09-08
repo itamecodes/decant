@@ -147,27 +147,24 @@ struct IndustrySegmented: View {
 }
 
 /// An animated bar waveform for the recording screen.
+/// A live level meter: one bar per recent mic sample (0…1), flat when silent.
 struct WaveformView: View {
+    let levels: [Double]
     var color: Color = Theme.accent300
-    var barCount: Int = 46
-    @State private var animate = false
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(0..<barCount, id: \.self) { i in
-                Rectangle()
-                    .fill(color)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .scaleEffect(y: animate ? 1 : 0.06, anchor: .center)
-                    .animation(
-                        .easeInOut(duration: 0.7 + Double(i % 5) * 0.16)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(i % 9) * 0.11),
-                        value: animate
-                    )
+        GeometryReader { geo in
+            HStack(alignment: .center, spacing: 3) {
+                ForEach(levels.indices, id: \.self) { i in
+                    Rectangle()
+                        .fill(color)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: max(3, levels[i] * geo.size.height))
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .animation(.easeOut(duration: 0.08), value: levels)
         }
-        .onAppear { animate = true }
     }
 }
 

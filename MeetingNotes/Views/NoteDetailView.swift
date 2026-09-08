@@ -52,6 +52,18 @@ struct NoteDetailView: View {
 
             Spacer()
 
+            Button {
+                withAnimation { note.isStarred.toggle() }
+            } label: {
+                Image(systemName: note.isStarred ? "star.fill" : "star")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(note.isStarred ? Theme.accent : Theme.text)
+                    .frame(width: 36, height: 36)
+                    .overlay(Rectangle().strokeBorder(note.isStarred ? Theme.accent : Theme.divider, lineWidth: 1))
+            }
+            .buttonStyle(PressableStyle())
+            .padding(.trailing, 8)
+
             Menu {
                 ShareLink(item: note.shareText) { Label("Share note", systemImage: "square.and.arrow.up") }
                 Divider()
